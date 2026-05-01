@@ -3,3 +3,6 @@
 ################################################################################
 
 /.vs
+/MeaiSample/.vs
+/MeaiSample/MeaiMinimalApi/bin/Debug/net10.0
+/MeaiSample/MeaiMinimalApi/obj
