@@ -1,0 +1,17 @@
+@TokenVisualizer.Api_HostAddress = https://localhost:7212
+
+###
+
+POST {{TokenVisualizer.Api_HostAddress}}/api/token-analysis
+Content-Type: application/json
+
+{
+  //AnalysisRequest
+}
+
+###
+
+@text=string
+GET {{TokenVisualizer.Api_HostAddress}}/api/tokenize?text={{text}}
+
+###
