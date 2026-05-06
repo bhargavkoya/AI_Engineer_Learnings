@@ -12,3 +12,6 @@
 /TokenVisualizer.Api/.vs
 /TokenVisualizer.Api/TokenVisualizer.Api/bin/Debug/net8.0
 /TokenVisualizer.Api/TokenVisualizer.Api/obj
+/AiCompare/.vs
+/AiCompare/AiCompare.Api/bin/Debug/net8.0
+/AiCompare/AiCompare.Api/obj
