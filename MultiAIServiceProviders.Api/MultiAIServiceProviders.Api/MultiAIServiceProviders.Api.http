@@ -1,0 +1,6 @@
+@MultiAIServiceProviders.Api_HostAddress = http://localhost:5174
+
+GET {{MultiAIServiceProviders.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
