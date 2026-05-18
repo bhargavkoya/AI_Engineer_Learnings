@@ -1,0 +1,6 @@
+@TokenCountingDemo_HostAddress = http://localhost:5175
+
+GET {{TokenCountingDemo_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
