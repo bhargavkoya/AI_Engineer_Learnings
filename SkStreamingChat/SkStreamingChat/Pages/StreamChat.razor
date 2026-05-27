@@ -1,0 +1,106 @@
+﻿@* Pages/StreamChat.razor *@
+
+@page "/chat"
+@rendermode @(new InteractiveServerRenderMode())
+@attribute [StreamRendering(true)]
+@inject Kernel Kernel
+
+
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.SemanticKernel
+@using Microsoft.SemanticKernel.ChatCompletion
+@using Microsoft.SemanticKernel.Connectors.OpenAI
+@using Microsoft.Extensions.DependencyInjection
+@using System.Text
+
+<PageTitle>Streaming Chat</PageTitle>
+
+<h1>Streaming Chat Demo</h1>
+
+<div class="chat-input">
+    <textarea @bind="_userInput"
+              @bind:event="oninput"
+              rows="3"
+              disabled="@_isStreaming"
+              placeholder="Ask a .NET question…" />
+    <button @onclick="SendAsync" disabled="@_isStreaming">
+        @(_isStreaming ? "Streaming…" : "Send")
+    </button>
+</div>
+
+@if (_responseText.Length > 0 || _isStreaming)
+{
+    <div class="response-box">
+        <p>@_responseText</p>
+        @if (_isStreaming)
+        {
+            <span class="blinking-cursor">|</span>
+        }
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="error-box">@_errorMessage</div>
+}
+
+@code {
+    private string _userInput = "";
+    private string _responseText = "";
+    private string _errorMessage = "";
+    private bool _isStreaming;
+
+    private async Task SendAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_userInput)) return;
+
+        _isStreaming = true;
+        _responseText = "";
+        _errorMessage = "";
+        // Trigger render before stream starts - shows "Streaming…" on button
+        await InvokeAsync(StateHasChanged);
+
+        var userText = _userInput;
+        _userInput = "";
+
+        var responseBuffer = new StringBuilder();
+
+        try
+        {
+            var chatHistory = new ChatHistory("You are a helpful .NET assistant.");
+            chatHistory.AddUserMessage(userText);
+
+            var settings = new OpenAIPromptExecutionSettings { MaxTokens = 500 };
+            var chatService = Kernel.Services
+                .GetRequiredService<IChatCompletionService>();
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+
+            await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(
+                chatHistory, settings, Kernel, cts.Token))
+            {
+                if (chunk.Content is not null)
+                {
+                    responseBuffer.Append(chunk.Content);
+                    _responseText = responseBuffer.ToString();
+
+                    // Marshal to Blazor sync context - mandatory for thread safety
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _errorMessage = "Request timed out. Partial response shown above.";
+        }
+        catch (System.ClientModel.ClientResultException ex)
+        {
+            _errorMessage = $"API error ({ex.Status}): {ex.Message}";
+        }
+        finally
+        {
+            _isStreaming = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}
