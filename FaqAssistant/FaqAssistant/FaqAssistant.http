@@ -1,0 +1,6 @@
+@FaqAssistant_HostAddress = http://localhost:5192
+
+GET {{FaqAssistant_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
