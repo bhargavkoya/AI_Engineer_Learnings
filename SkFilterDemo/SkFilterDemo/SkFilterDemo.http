@@ -1,0 +1,6 @@
+@SkFilterDemo_HostAddress = http://localhost:5211
+
+GET {{SkFilterDemo_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
