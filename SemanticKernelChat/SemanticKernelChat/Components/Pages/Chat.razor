@@ -1,0 +1,173 @@
+﻿@* Pages/Chat.razor - complete streaming chat component *@
+@page "/chat"
+@rendermode InteractiveServer
+@attribute [StreamRendering(true)]
+@inject Kernel Kernel
+@using Microsoft.SemanticKernel
+@using Microsoft.SemanticKernel.ChatCompletion
+@using Microsoft.SemanticKernel.Connectors.OpenAI
+@using Microsoft.Extensions.DependencyInjection
+@using Microsoft.ML.Tokenizers
+@using System.Text
+
+<h2>SK Streaming Chat</h2>
+
+<div class="chat-messages">
+    @foreach (var msg in _messages)
+    {
+        <div class="message @(msg.Role == "user" ? "user-message" : "ai-message")">
+            <strong>@msg.Role:</strong> @msg.Text
+        </div>
+    }
+
+    @if (_isStreaming)
+    {
+        <div class="message ai-message streaming">
+            <strong>assistant:</strong> @_currentStreamText<span class="cursor">▌</span>
+        </div>
+    }
+</div>
+
+@if (_filterWarning)
+{
+    <div class="filter-warning">
+        ⚠ Response blocked by content policy.
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="error-banner">Error: @_errorMessage</div>
+}
+
+<div class="token-stats">
+    @if (_lastPromptTokens > 0 || _lastCompletionTokens > 0)
+    {
+        <span>Last request: ~@_lastPromptTokens prompt tokens, ~@_lastCompletionTokens completion tokens</span>
+    }
+    <span>Session total: ~@_sessionTokens tokens</span>
+</div>
+
+<div class="input-row">
+    <textarea @bind="_userInput"
+              @bind:event="oninput"
+              rows="2"
+              disabled="@_isStreaming"
+              placeholder="Type your message..." />
+    <button @onclick="SendMessageAsync"
+            disabled="@_isStreaming">
+        @(_isStreaming ? "Streaming..." : "Send")
+    </button>
+</div>
+
+@code {
+    // Single tokenizer instance - reused across all requests in this component
+    private static readonly TiktokenTokenizer Tokenizer =
+        TiktokenTokenizer.CreateForModel("gpt-4o");
+
+    // Conversation state
+    private readonly ChatHistory _chatHistory = new("You are a helpful .NET assistant.");
+    private readonly List<(string Role, string Text)> _messages = new();
+
+    // UI state
+    private string _userInput = "";
+    private string _currentStreamText = "";
+    private string _errorMessage = "";
+    private bool _isStreaming;
+    private bool _filterWarning;
+
+    // Token counters
+    private int _lastPromptTokens;
+    private int _lastCompletionTokens;
+    private int _sessionTokens;
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_userInput) || _isStreaming) return;
+
+        var userText = _userInput.Trim();
+        _userInput = "";
+        _filterWarning = false;
+        _errorMessage = "";
+        _isStreaming = true;
+        _currentStreamText = "";
+
+        // Add user message to history and display list
+        _chatHistory.AddUserMessage(userText);
+        _messages.Add(("user", userText));
+        await InvokeAsync(StateHasChanged);
+
+        var responseBuffer = new StringBuilder();
+        string? lastFinishReason = null;
+
+        try
+        {
+            var chatService = Kernel.Services.GetRequiredService<IChatCompletionService>();
+            var settings = new OpenAIPromptExecutionSettings { MaxTokens = 800 };
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+            await foreach (var chunk in chatService.GetStreamingChatMessageContentsAsync(
+                _chatHistory, settings, Kernel, cts.Token))
+            {
+                if (chunk.Content is not null)
+                {
+                    responseBuffer.Append(chunk.Content);
+                    _currentStreamText = responseBuffer.ToString();
+                    await InvokeAsync(StateHasChanged);
+                }
+
+                var finishReason = chunk.Metadata?["FinishReason"]?.ToString();
+                if (finishReason is not null)
+                    lastFinishReason = finishReason;
+            }
+
+            if (lastFinishReason == "content_filter")
+            {
+                // Discard partial response - do not add to history
+                _filterWarning = true;
+                _currentStreamText = "";
+            }
+            else
+            {
+                // Commit response to history and display
+                string fullResponse = responseBuffer.ToString();
+                _chatHistory.AddAssistantMessage(fullResponse);
+                _messages.Add(("assistant", fullResponse));
+
+                // Token counting - post stream only
+                _lastCompletionTokens = Tokenizer.CountTokens(fullResponse);
+
+                // Estimate prompt tokens from full chat history
+                _lastPromptTokens = 0;
+                foreach (var message in _chatHistory)
+                {
+                    _lastPromptTokens += 4;
+                    if (message.Content is not null)
+                        _lastPromptTokens += Tokenizer.CountTokens(message.Content);
+                }
+                _lastPromptTokens += 2;
+
+                _sessionTokens += _lastPromptTokens + _lastCompletionTokens;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _errorMessage = "Request timed out.";
+            if (responseBuffer.Length > 0)
+                _messages.Add(("assistant", responseBuffer + " [timed out]"));
+        }
+        catch (System.ClientModel.ClientResultException ex)
+        {
+            _errorMessage = ex.Status == 429
+                ? "Rate limit reached. Please wait and try again."
+                : $"API error {ex.Status}.";
+        }
+        finally
+        {
+            _isStreaming = false;
+            _currentStreamText = "";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}
