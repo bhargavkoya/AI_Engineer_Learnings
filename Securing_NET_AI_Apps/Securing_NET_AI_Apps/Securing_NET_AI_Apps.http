@@ -1,0 +1,6 @@
+@Securing_NET_AI_Apps_HostAddress = http://localhost:5290
+
+GET {{Securing_NET_AI_Apps_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
