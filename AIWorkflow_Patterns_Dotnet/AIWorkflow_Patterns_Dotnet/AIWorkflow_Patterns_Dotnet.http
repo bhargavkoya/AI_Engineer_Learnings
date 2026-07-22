@@ -1,0 +1,6 @@
+@AIWorkflow_Patterns_Dotnet_HostAddress = http://localhost:5104
+
+GET {{AIWorkflow_Patterns_Dotnet_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
