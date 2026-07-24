@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="TicketML.Api/TicketML.Api.csproj" />
+  <Project Path="TicketML.Training/TicketML.Training.csproj" />
+</Solution>

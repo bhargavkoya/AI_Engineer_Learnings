@@ -105,3 +105,6 @@
 /Otel_Ai_Dotnet/.vs/Otel_Ai_Dotnet.slnx
 /Otel_Ai_Dotnet/Otel_Ai_Dotnet/bin/Debug/net8.0
 /Otel_Ai_Dotnet/Otel_Ai_Dotnet/obj
+/TicketMLSolution/.vs/TicketMLSolution.slnx
+/TicketMLSolution/TicketML.Api/obj
+/TicketMLSolution/TicketML.Training/obj
